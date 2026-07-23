@@ -383,6 +383,88 @@
       text-transform: uppercase;
     }
 
+    .control[hidden] { display: none; }
+
+    .image-drop {
+      position: relative;
+      display: grid;
+      min-height: 86px;
+      grid-template-columns: 72px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 8px;
+      overflow: hidden;
+      border: 1px dashed #4b4b41;
+      border-radius: 4px;
+      color: #8d8d82;
+      background: #24241f;
+      cursor: pointer;
+      transition: border-color .18s, background .18s;
+    }
+
+    .image-drop:hover, .image-drop.dragging {
+      border-color: var(--acid);
+      background: rgba(215, 255, 67, .045);
+    }
+
+    .image-thumb {
+      position: relative;
+      display: grid;
+      width: 72px;
+      height: 68px;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid #414138;
+      background:
+        linear-gradient(45deg, #30302a 25%, transparent 25%, transparent 75%, #30302a 75%),
+        linear-gradient(45deg, #30302a 25%, #272722 25%, #272722 75%, #30302a 75%);
+      background-position: 0 0, 6px 6px;
+      background-size: 12px 12px;
+    }
+
+    .image-thumb::after {
+      content: "IMG";
+      color: #66665d;
+      font: 600 9px/1 monospace;
+      letter-spacing: .12em;
+    }
+
+    .image-thumb img {
+      position: absolute;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .image-copy strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #d1d1c6;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .image-copy small { display: block; max-width: 170px; font-size: 9px; line-height: 1.45; }
+
+    .image-remove {
+      position: absolute;
+      z-index: 2;
+      top: 6px;
+      right: 6px;
+      display: none;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: 1px solid #525247;
+      border-radius: 50%;
+      color: #b7b7ad;
+      background: rgba(23, 23, 20, .88);
+      cursor: pointer;
+    }
+
+    .image-drop.has-image .image-remove { display: grid; place-items: center; }
+
     .sidebar-foot {
       display: flex;
       align-items: center;
@@ -738,10 +820,21 @@
           ]
         },
         {
-          id: "fade", label: "渐隐 / Fade", controls: [
-            { key: "fadeAngle", label: "渐隐方向", type: "range", min: -180, max: 180, step: 1, default: 0, unit: "°" },
-            { key: "fadeStart", label: "渐隐起点", type: "range", min: -.2, max: 1.2, step: .01, default: .43, display: "percent" },
-            { key: "fadeWidth", label: "过渡宽度", type: "range", min: .02, max: 1.2, step: .01, default: .28, display: "percent" },
+          id: "fade", label: "尺寸场 / Size Field", controls: [
+            { key: "sizeField", label: "尺寸分布", type: "select", default: "linear", options: [["linear", "线性 · Linear"], ["radial", "径向 · Radial"], ["grid", "规则网格 · Grid"], ["random", "随机场 · Random"], ["image", "图片亮度 · Image"]] },
+            { key: "fadeAngle", label: "线性方向", type: "range", min: -180, max: 180, step: 1, default: 0, unit: "°", modes: ["linear"] },
+            { key: "fadeStart", label: "线性起点", type: "range", min: -.2, max: 1.2, step: .01, default: .43, display: "percent", modes: ["linear"] },
+            { key: "fadeWidth", label: "过渡宽度", type: "range", min: .02, max: 1.2, step: .01, default: .28, display: "percent", modes: ["linear"] },
+            { key: "fieldCenterX", label: "中心 X", type: "range", min: 0, max: 1, step: .01, default: .5, display: "percent", modes: ["radial"] },
+            { key: "fieldCenterY", label: "中心 Y", type: "range", min: 0, max: 1, step: .01, default: .5, display: "percent", modes: ["radial"] },
+            { key: "fieldRadius", label: "半径 / 扩散", type: "range", min: .08, max: 1.5, step: .01, default: .42, display: "percent", modes: ["radial", "grid"] },
+            { key: "fieldCount", label: "径向场数量", type: "range", min: 1, max: 16, step: 1, default: 1, modes: ["radial"] },
+            { key: "fieldLayout", label: "多中心排列", type: "select", default: "regular", options: [["regular", "规则矩阵"], ["random", "随机分布"]], modes: ["radial"] },
+            { key: "fieldSpread", label: "多中心范围", type: "range", min: .05, max: 1.4, step: .01, default: .75, display: "percent", modes: ["radial"] },
+            { key: "fieldGridX", label: "网格列数", type: "range", min: 1, max: 16, step: 1, default: 5, modes: ["grid"] },
+            { key: "fieldGridY", label: "网格行数", type: "range", min: 1, max: 20, step: 1, default: 7, modes: ["grid"] },
+            { key: "randomType", label: "随机类型", type: "select", default: "smooth", options: [["smooth", "连续噪声"], ["cell", "逐格随机"]], modes: ["random"] },
+            { key: "randomScale", label: "随机尺度", type: "range", min: .5, max: 24, step: .1, default: 7, modes: ["random"] },
             { key: "gamma", label: "衰减曲线", type: "range", min: .2, max: 4, step: .05, default: 1.25 },
             { key: "minSize", label: "末端尺寸", type: "range", min: 0, max: .8, step: .01, default: .02, display: "percent" },
             { key: "sizeFade", label: "尺寸渐隐", type: "toggle", default: true },
@@ -769,6 +862,14 @@
           ]
         },
         {
+          id: "image", label: "图片 / Image", controls: [
+            { key: "imageData", label: "叠加图片", type: "image", default: "" },
+            { key: "imageInfluence", label: "尺寸映射强度", type: "range", min: 0, max: 1, step: .01, default: 0, display: "percent" },
+            { key: "imageOpacity", label: "可见叠加透明度", type: "range", min: 0, max: 1, step: .01, default: 0, display: "percent" },
+            { key: "imageFit", label: "图片适配", type: "select", default: "cover", options: [["cover", "覆盖 · Cover"], ["contain", "完整 · Contain"], ["stretch", "拉伸 · Stretch"]] }
+          ]
+        },
+        {
           id: "output", label: "颜色 / Output", controls: [
             { key: "foreground", label: "图形颜色", type: "color", default: "#11110f" },
             { key: "background", label: "背景颜色", type: "color", default: "#f5f2e9" },
@@ -789,7 +890,11 @@
       const builtIns = [
         { id: "default", name: "默认", state: { ...defaults } },
         { id: "soft-grain", name: "柔和颗粒", state: { ...defaults, shape: "circle", cellSize: 26, fadeWidth: .42, gamma: .72, dropout: .35, opacityFade: true, noiseAmount: .22, positionJitter: .12, sizeJitter: .22, maskShape: "ellipse", maskWidth: .7 } },
-        { id: "sharp-drift", name: "锐利风蚀", state: { ...defaults, cellSize: 24, fadeAngle: -18, fadeStart: .33, fadeWidth: .46, gamma: 2.2, dropout: .92, noiseAmount: .31, noiseScale: 8.4, positionJitter: .28, rotationJitter: 34, sizeJitter: .32, maskWidth: .72 } }
+        { id: "sharp-drift", name: "锐利风蚀", state: { ...defaults, cellSize: 24, fadeAngle: -18, fadeStart: .33, fadeWidth: .46, gamma: 2.2, dropout: .92, noiseAmount: .31, noiseScale: 8.4, positionJitter: .28, rotationJitter: 34, sizeJitter: .32, maskWidth: .72 } },
+        { id: "radial-orbit", name: "径向轨道", state: { ...defaults, sizeField: "radial", fieldCount: 1, fieldRadius: .52, maskShape: "full", dropout: .18, noiseAmount: .06, gamma: .82 } },
+        { id: "multi-field", name: "多点矩阵", state: { ...defaults, sizeField: "radial", fieldCount: 9, fieldLayout: "regular", fieldSpread: .72, fieldRadius: .2, maskShape: "full", dropout: .16, gamma: 1.4, cellSize: 25 } },
+        { id: "grid-pulse", name: "规则脉冲", state: { ...defaults, sizeField: "grid", fieldGridX: 5, fieldGridY: 7, fieldRadius: .78, maskShape: "full", dropout: .12, noiseAmount: .03, cellSize: 24 } },
+        { id: "random-field", name: "随机地形", state: { ...defaults, sizeField: "random", randomType: "smooth", randomScale: 8.5, maskShape: "full", dropout: .38, noiseAmount: .08, cellSize: 23, sizeJitter: .16 } }
       ];
 
       let userConfigs = loadConfigs();
@@ -801,6 +906,8 @@
       let editingConfigId = null;
       let contextConfigId = null;
       let renderQueued = false;
+      let sourceImage = null;
+      let sourceImageUrl = "";
       let view = { zoom: 1, fitZoom: 1, x: 0, y: 0 };
 
       const els = {
@@ -852,17 +959,27 @@
             clean[key] = /^#[0-9a-f]{6}$/i.test(value) ? value : control.default;
           } else if (control.type === "select") {
             clean[key] = control.options.some(option => option[0] === value) ? value : control.default;
+          } else if (control.type === "image") {
+            clean[key] = typeof value === "string" && (value === "" || value.startsWith("data:image/")) ? value : control.default;
           }
         }
         return clean;
       }
 
       function persistConfigs() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(userConfigs));
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(userConfigs));
+        } catch {
+          toast("配置容量不足，请换用较小图片或删除旧配置");
+        }
       }
 
       function persistLastState() {
-        localStorage.setItem(LAST_KEY, JSON.stringify(state));
+        try {
+          localStorage.setItem(LAST_KEY, JSON.stringify(state));
+        } catch {
+          toast("图片容量超过浏览器本地存储限制");
+        }
       }
 
       function buildControls() {
@@ -890,6 +1007,7 @@
         const row = document.createElement("div");
         row.className = `control ${control.type === "toggle" ? "toggle-row" : ""}`;
         row.dataset.key = control.key;
+        if (control.modes) row.dataset.modes = control.modes.join(",");
 
         const head = document.createElement("div");
         head.className = "control-head";
@@ -966,6 +1084,28 @@
           });
           line.append(picker, hex);
           row.append(line);
+        } else if (control.type === "image") {
+          row.append(head);
+          const file = document.createElement("input");
+          file.type = "file";
+          file.accept = "image/*";
+          file.hidden = true;
+          file.dataset.role = "file";
+          const drop = document.createElement("div");
+          drop.className = "image-drop";
+          drop.tabIndex = 0;
+          drop.setAttribute("role", "button");
+          drop.setAttribute("aria-label", "选择或拖入图片");
+          drop.innerHTML = `<div class="image-thumb"><img alt="图片预览" hidden></div><div class="image-copy"><strong>选择或拖入图片</strong><small>亮度可驱动尺寸，也可作为可见图层叠加</small></div><button class="image-remove" type="button" aria-label="移除图片">×</button>`;
+          const choose = () => file.click();
+          drop.addEventListener("click", event => { if (!event.target.closest(".image-remove")) choose(); });
+          drop.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); choose(); } });
+          file.addEventListener("change", () => { if (file.files[0]) handleImageFile(file.files[0]); file.value = ""; });
+          ["dragenter", "dragover"].forEach(type => drop.addEventListener(type, event => { event.preventDefault(); drop.classList.add("dragging"); }));
+          ["dragleave", "drop"].forEach(type => drop.addEventListener(type, event => { event.preventDefault(); drop.classList.remove("dragging"); }));
+          drop.addEventListener("drop", event => { const imageFile = [...event.dataTransfer.files].find(item => item.type.startsWith("image/")); if (imageFile) handleImageFile(imageFile); });
+          drop.querySelector(".image-remove").addEventListener("click", event => { event.stopPropagation(); setParam("imageData", "", true); toast("图片已移除"); });
+          row.append(file, drop);
         }
         return row;
       }
@@ -976,6 +1116,8 @@
         dirty = true;
         persistLastState();
         syncControl(key);
+        if (key === "imageData") loadSourceImage(value);
+        if (key === "sizeField") syncControlVisibility();
         syncDirtyState();
         scheduleRender();
         if (key === "ratio") requestAnimationFrame(() => requestAnimationFrame(fitCanvas));
@@ -1010,11 +1152,74 @@
         } else if (control.type === "color") {
           row.querySelector('input[type="color"]').value = state[key];
           row.querySelector('.hex-input').value = state[key].toUpperCase();
+        } else if (control.type === "image") {
+          const drop = row.querySelector(".image-drop");
+          const image = drop.querySelector("img");
+          const hasImage = Boolean(state[key]);
+          drop.classList.toggle("has-image", hasImage);
+          image.hidden = !hasImage;
+          image.src = hasImage ? state[key] : "";
+          drop.querySelector("strong").textContent = hasImage ? "图片已载入" : "选择或拖入图片";
         }
       }
 
       function syncControls() {
         controlsByKey.forEach((_, key) => syncControl(key));
+        syncControlVisibility();
+      }
+
+      function syncControlVisibility() {
+        els.controls.querySelectorAll("[data-modes]").forEach(row => {
+          row.hidden = !row.dataset.modes.split(",").includes(state.sizeField);
+        });
+      }
+
+      function handleImageFile(file) {
+        if (!file || !file.type.startsWith("image/")) {
+          toast("请选择图片文件");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => toast("图片读取失败");
+        reader.onload = () => {
+          const image = new Image();
+          image.onerror = () => toast("无法解析这张图片");
+          image.onload = () => {
+            const maxSide = 1200;
+            const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            const data = canvas.toDataURL("image/webp", .9);
+            setParam("imageData", data, true);
+            if (state.sizeField === "image") setParam("imageInfluence", 1, true);
+            toast(`图片已载入 · ${canvas.width} × ${canvas.height}`);
+          };
+          image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function loadSourceImage(url) {
+        sourceImageUrl = url || "";
+        if (!sourceImageUrl) {
+          sourceImage = null;
+          scheduleRender();
+          return;
+        }
+        const pendingImage = new Image();
+        pendingImage.onload = () => {
+          if (sourceImageUrl !== url) return;
+          sourceImage = pendingImage;
+          scheduleRender();
+        };
+        pendingImage.onerror = () => {
+          if (sourceImageUrl === url) sourceImage = null;
+          toast("保存的图片无法载入");
+        };
+        pendingImage.src = url;
       }
 
       function syncDirtyState() {
@@ -1034,7 +1239,7 @@
           const chip = makePresetChip(config, "user");
           els.presetList.append(chip);
         });
-        els.configCount.textContent = userConfigs.length ? `${userConfigs.length} 已保存` : "3 内置";
+        els.configCount.textContent = userConfigs.length ? `${builtIns.length} 内置 · ${userConfigs.length} 已保存` : `${builtIns.length} 内置`;
       }
 
       function makePresetChip(config, type) {
@@ -1057,6 +1262,7 @@
 
       function loadConfig(config, type) {
         state = sanitizeState(config.state);
+        loadSourceImage(state.imageData);
         currentConfig = { type, id: config.id, name: config.name };
         dirty = false;
         persistLastState();
@@ -1167,6 +1373,7 @@
 
       function resetAll() {
         state = { ...defaults };
+        loadSourceImage("");
         currentConfig = { type: "builtIn", id: "default", name: "默认" };
         dirty = false;
         localStorage.removeItem(LAST_KEY);
@@ -1226,15 +1433,20 @@
         ctx.save();
         ctx.fillStyle = state.background;
         ctx.fillRect(0, 0, width, height);
+        const imageSampler = createImageSampler(width, height);
+        if (sourceImage && state.imageOpacity > 0) {
+          ctx.save();
+          ctx.globalAlpha = state.imageOpacity;
+          drawFittedImage(ctx, sourceImage, width, height, state.imageFit);
+          ctx.restore();
+        }
         ctx.fillStyle = state.foreground;
 
         const cell = state.cellSize;
         const dy = cell * Math.sqrt(3) / 2;
         const cols = Math.ceil(width / cell) + 5;
         const rows = Math.ceil(height / dy) + 5;
-        const angle = state.fadeAngle * Math.PI / 180;
-        const directionX = Math.cos(angle);
-        const directionY = Math.sin(angle);
+        const fieldContext = createFieldContext(width, height, imageSampler);
         let visibleCount = 0;
 
         for (let row = -2; row < rows; row++) {
@@ -1246,9 +1458,8 @@
             const ny = baseY / height;
             if (!insideMask(nx, ny)) continue;
 
-            const projected = .5 + (nx - .5) * directionX + (ny - .5) * directionY;
             const noise = (valueNoise(nx * state.noiseScale, ny * state.noiseScale, state.seed) - .5) * 2 * state.noiseAmount;
-            let t = clamp((projected - state.fadeStart + noise) / Math.max(state.fadeWidth, .001), 0, 1);
+            let t = clamp(sampleSizeField(nx, ny, col, row, fieldContext) + noise, 0, 1);
             if (state.invert) t = 1 - t;
             const eased = Math.pow(smoothstep(t), state.gamma);
 
@@ -1280,6 +1491,128 @@
         }
         ctx.restore();
         return visibleCount;
+      }
+
+      function createFieldContext(width, height, imageSampler) {
+        const angle = state.fadeAngle * Math.PI / 180;
+        const context = {
+          width,
+          height,
+          aspectY: height / width,
+          directionX: Math.cos(angle),
+          directionY: Math.sin(angle),
+          imageSampler,
+          centers: []
+        };
+        if (state.sizeField === "radial") context.centers = createRadialCenters(width, height);
+        return context;
+      }
+
+      function createRadialCenters(width, height) {
+        const count = Math.max(1, Math.round(state.fieldCount));
+        if (count === 1) return [{ x: state.fieldCenterX, y: state.fieldCenterY }];
+        const centers = [];
+        if (state.fieldLayout === "random") {
+          for (let index = 0; index < count; index++) {
+            const x = state.fieldCenterX + (hash2(index, 193, state.seed) - .5) * state.fieldSpread;
+            const y = state.fieldCenterY + (hash2(index, 719, state.seed) - .5) * state.fieldSpread;
+            centers.push({ x: clamp(x, 0, 1), y: clamp(y, 0, 1) });
+          }
+          return centers;
+        }
+        const canvasRatio = width / height;
+        const columns = Math.max(1, Math.ceil(Math.sqrt(count * canvasRatio)));
+        const rows = Math.ceil(count / columns);
+        for (let index = 0; index < count; index++) {
+          const column = index % columns;
+          const row = Math.floor(index / columns);
+          const tx = columns === 1 ? 0 : column / (columns - 1) - .5;
+          const ty = rows === 1 ? 0 : row / (rows - 1) - .5;
+          centers.push({
+            x: clamp(state.fieldCenterX + tx * state.fieldSpread, 0, 1),
+            y: clamp(state.fieldCenterY + ty * state.fieldSpread, 0, 1)
+          });
+        }
+        return centers;
+      }
+
+      function sampleSizeField(x, y, column, row, context) {
+        let value = 0;
+        if (state.sizeField === "linear") {
+          const projected = .5 + (x - .5) * context.directionX + (y - .5) * context.directionY;
+          value = clamp((projected - state.fadeStart) / Math.max(state.fadeWidth, .001), 0, 1);
+        } else if (state.sizeField === "radial") {
+          let nearest = Infinity;
+          for (const center of context.centers) {
+            const dx = x - center.x;
+            const dy = (y - center.y) * context.aspectY;
+            nearest = Math.min(nearest, Math.hypot(dx, dy));
+          }
+          value = clamp(nearest / Math.max(state.fieldRadius, .001), 0, 1);
+        } else if (state.sizeField === "grid") {
+          const localX = (x * Math.round(state.fieldGridX)) % 1 - .5;
+          const localY = (y * Math.round(state.fieldGridY)) % 1 - .5;
+          const distance = Math.hypot(localX * 2, localY * 2);
+          value = clamp(distance / Math.max(state.fieldRadius, .001), 0, 1);
+        } else if (state.sizeField === "random") {
+          value = state.randomType === "cell"
+            ? hash2(column, row, state.seed + 991)
+            : valueNoise(x * state.randomScale, y * state.randomScale, state.seed + 991);
+        } else if (state.sizeField === "image") {
+          value = sampleImageLuminance(context.imageSampler, x, y);
+        }
+
+        if (state.sizeField !== "image" && state.imageInfluence > 0 && context.imageSampler) {
+          value = lerp(value, sampleImageLuminance(context.imageSampler, x, y), state.imageInfluence);
+        }
+        return value;
+      }
+
+      function createImageSampler(width, height) {
+        if (!sourceImage || !sourceImage.complete) return null;
+        const sampler = document.createElement("canvas");
+        sampler.width = 256;
+        sampler.height = Math.max(1, Math.round(256 * height / width));
+        const samplerContext = sampler.getContext("2d", { willReadFrequently: true });
+        samplerContext.fillStyle = "#ffffff";
+        samplerContext.fillRect(0, 0, sampler.width, sampler.height);
+        drawFittedImage(samplerContext, sourceImage, sampler.width, sampler.height, state.imageFit);
+        try {
+          return { width: sampler.width, height: sampler.height, data: samplerContext.getImageData(0, 0, sampler.width, sampler.height).data };
+        } catch {
+          return null;
+        }
+      }
+
+      function sampleImageLuminance(sampler, x, y) {
+        if (!sampler) return 0;
+        const px = clamp(Math.floor(x * sampler.width), 0, sampler.width - 1);
+        const py = clamp(Math.floor(y * sampler.height), 0, sampler.height - 1);
+        const index = (py * sampler.width + px) * 4;
+        const red = sampler.data[index];
+        const green = sampler.data[index + 1];
+        const blue = sampler.data[index + 2];
+        return (red * .2126 + green * .7152 + blue * .0722) / 255;
+      }
+
+      function drawFittedImage(ctx, image, width, height, fit) {
+        if (fit === "stretch") {
+          ctx.drawImage(image, 0, 0, width, height);
+          return;
+        }
+        const imageRatio = image.naturalWidth / image.naturalHeight;
+        const targetRatio = width / height;
+        const cover = fit === "cover";
+        let drawWidth;
+        let drawHeight;
+        if ((imageRatio > targetRatio) === cover) {
+          drawHeight = height;
+          drawWidth = drawHeight * imageRatio;
+        } else {
+          drawWidth = width;
+          drawHeight = drawWidth / imageRatio;
+        }
+        ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
       }
 
       function insideMask(x, y) {
@@ -1505,6 +1838,7 @@
 
       buildControls();
       syncControls();
+      loadSourceImage(state.imageData);
       renderPresetList();
       syncDirtyState();
       renderPreview();
