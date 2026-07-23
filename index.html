@@ -816,7 +816,7 @@
             { key: "shapeScale", label: "图形占比", type: "range", min: .15, max: 1.35, step: .01, default: .94, display: "percent" },
             { key: "aspect", label: "图形纵横比", type: "range", min: .3, max: 2, step: .01, default: 1 },
             { key: "shapeRotation", label: "图形旋转", type: "range", min: -180, max: 180, step: 1, default: 0, unit: "°" },
-            { key: "alternate", label: "交替翻转", type: "toggle", default: true }
+            { key: "alternate", label: "物理交替翻转", type: "toggle", default: true }
           ]
         },
         {
@@ -1443,17 +1443,25 @@
         ctx.fillStyle = state.foreground;
 
         const cell = state.cellSize;
-        const dy = cell * Math.sqrt(3) / 2;
-        const cols = Math.ceil(width / cell) + 5;
+        const physicalTriangleGrid = state.shape === "triangle" && state.alternate;
+        const triangleHeight = cell * Math.sqrt(3) / 2 * state.aspect;
+        const dy = physicalTriangleGrid ? triangleHeight : cell * Math.sqrt(3) / 2;
+        const dx = physicalTriangleGrid ? cell / 2 : cell;
+        const cols = Math.ceil(width / dx) + 6;
         const rows = Math.ceil(height / dy) + 5;
         const fieldContext = createFieldContext(width, height, imageSampler);
         let visibleCount = 0;
 
         for (let row = -2; row < rows; row++) {
-          const baseY = row * dy;
-          const offset = (row & 1) ? cell * .5 : 0;
+          const genericY = row * dy;
+          const offset = !physicalTriangleGrid && (row & 1) ? cell * .5 : 0;
           for (let col = -2; col < cols; col++) {
-            const baseX = col * cell + offset;
+            const physicalParity = (col + row) & 1;
+            const trianglePointsUp = physicalParity === 1;
+            const baseX = physicalTriangleGrid ? (col + 1) * dx : col * cell + offset;
+            const baseY = physicalTriangleGrid
+              ? row * triangleHeight + triangleHeight * (trianglePointsUp ? 2 / 3 : 1 / 3)
+              : genericY;
             const nx = baseX / width;
             const ny = baseY / height;
             if (!insideMask(nx, ny)) continue;
@@ -1477,7 +1485,7 @@
 
             const jitterRotation = (hash2(col - 91, row + 11, state.seed) - .5) * 2 * state.rotationJitter;
             let rotation = state.shapeRotation + jitterRotation;
-            if (state.alternate && ((col + row) & 1)) rotation += 180;
+            if (physicalTriangleGrid ? !trianglePointsUp : state.alternate && physicalParity) rotation += 180;
 
             ctx.save();
             ctx.globalAlpha = alpha;
