@@ -385,6 +385,18 @@
 
     .control[hidden] { display: none; }
 
+    .control.geometry-locked {
+      opacity: .36;
+      pointer-events: none;
+    }
+
+    .control.geometry-locked .control-label::after {
+      content: " · LOCKED";
+      color: var(--acid);
+      font: 600 8px/1 monospace;
+      letter-spacing: .08em;
+    }
+
     .image-drop {
       position: relative;
       display: grid;
@@ -816,7 +828,8 @@
             { key: "shapeScale", label: "图形占比", type: "range", min: .15, max: 1.35, step: .01, default: .94, display: "percent" },
             { key: "aspect", label: "图形纵横比", type: "range", min: .3, max: 2, step: .01, default: 1 },
             { key: "shapeRotation", label: "图形旋转", type: "range", min: -180, max: 180, step: 1, default: 0, unit: "°" },
-            { key: "alternate", label: "物理交替翻转", type: "toggle", default: true }
+            { key: "alternate", label: "物理交替翻转", type: "toggle", default: true },
+            { key: "geometryLock", label: "几何锁定", type: "toggle", default: true }
           ]
         },
         {
@@ -846,8 +859,8 @@
             { key: "dropout", label: "消失概率", type: "range", min: 0, max: 1, step: .01, default: .72, display: "percent" },
             { key: "noiseAmount", label: "边缘噪声", type: "range", min: 0, max: .7, step: .01, default: .14, display: "percent" },
             { key: "noiseScale", label: "噪声尺度", type: "range", min: .5, max: 18, step: .1, default: 5.2 },
-            { key: "positionJitter", label: "位置抖动", type: "range", min: 0, max: .8, step: .01, default: .04, display: "percent" },
-            { key: "rotationJitter", label: "角度抖动", type: "range", min: 0, max: 90, step: 1, default: 5, unit: "°" },
+            { key: "positionJitter", label: "位置抖动", type: "range", min: 0, max: .8, step: .01, default: 0, display: "percent" },
+            { key: "rotationJitter", label: "角度抖动", type: "range", min: 0, max: 90, step: 1, default: 0, unit: "°" },
             { key: "sizeJitter", label: "尺寸抖动", type: "range", min: 0, max: .8, step: .01, default: .08, display: "percent" },
             { key: "seed", label: "随机种子", type: "range", min: 1, max: 9999, step: 1, default: 253 }
           ]
@@ -890,7 +903,7 @@
       const builtIns = [
         { id: "default", name: "默认", state: { ...defaults } },
         { id: "soft-grain", name: "柔和颗粒", state: { ...defaults, shape: "circle", cellSize: 26, fadeWidth: .42, gamma: .72, dropout: .35, opacityFade: true, noiseAmount: .22, positionJitter: .12, sizeJitter: .22, maskShape: "ellipse", maskWidth: .7 } },
-        { id: "sharp-drift", name: "锐利风蚀", state: { ...defaults, cellSize: 24, fadeAngle: -18, fadeStart: .33, fadeWidth: .46, gamma: 2.2, dropout: .92, noiseAmount: .31, noiseScale: 8.4, positionJitter: .28, rotationJitter: 34, sizeJitter: .32, maskWidth: .72 } },
+        { id: "sharp-drift", name: "锐利风蚀", state: { ...defaults, geometryLock: false, cellSize: 24, fadeAngle: -18, fadeStart: .33, fadeWidth: .46, gamma: 2.2, dropout: .92, noiseAmount: .31, noiseScale: 8.4, positionJitter: .28, rotationJitter: 34, sizeJitter: .32, maskWidth: .72 } },
         { id: "radial-orbit", name: "径向轨道", state: { ...defaults, sizeField: "radial", fieldCount: 1, fieldRadius: .52, maskShape: "full", dropout: .18, noiseAmount: .06, gamma: .82 } },
         { id: "multi-field", name: "多点矩阵", state: { ...defaults, sizeField: "radial", fieldCount: 9, fieldLayout: "regular", fieldSpread: .72, fieldRadius: .2, maskShape: "full", dropout: .16, gamma: 1.4, cellSize: 25 } },
         { id: "grid-pulse", name: "规则脉冲", state: { ...defaults, sizeField: "grid", fieldGridX: 5, fieldGridY: 7, fieldRadius: .78, maskShape: "full", dropout: .12, noiseAmount: .03, cellSize: 24 } },
@@ -1118,6 +1131,7 @@
         syncControl(key);
         if (key === "imageData") loadSourceImage(value);
         if (key === "sizeField") syncControlVisibility();
+        if (["shape", "alternate", "geometryLock"].includes(key)) syncGeometryLockState();
         syncDirtyState();
         scheduleRender();
         if (key === "ratio") requestAnimationFrame(() => requestAnimationFrame(fitCanvas));
@@ -1166,11 +1180,27 @@
       function syncControls() {
         controlsByKey.forEach((_, key) => syncControl(key));
         syncControlVisibility();
+        syncGeometryLockState();
       }
 
       function syncControlVisibility() {
         els.controls.querySelectorAll("[data-modes]").forEach(row => {
           row.hidden = !row.dataset.modes.split(",").includes(state.sizeField);
+        });
+      }
+
+      function geometryIsLocked() {
+        return state.shape === "triangle" && state.alternate && state.geometryLock;
+      }
+
+      function syncGeometryLockState() {
+        const locked = geometryIsLocked();
+        ["shapeRotation", "positionJitter", "rotationJitter"].forEach(key => {
+          const row = els.controls.querySelector(`[data-key="${key}"]`);
+          if (!row) return;
+          row.classList.toggle("geometry-locked", locked);
+          row.querySelectorAll("input, select").forEach(input => { input.disabled = locked; });
+          row.title = locked ? "几何锁定已启用：中心位置与角度由三角晶格决定" : "";
         });
       }
 
@@ -1444,6 +1474,7 @@
 
         const cell = state.cellSize;
         const physicalTriangleGrid = state.shape === "triangle" && state.alternate;
+        const geometryLocked = physicalTriangleGrid && state.geometryLock;
         const triangleHeight = cell * Math.sqrt(3) / 2 * state.aspect;
         const dy = physicalTriangleGrid ? triangleHeight : cell * Math.sqrt(3) / 2;
         const dx = physicalTriangleGrid ? cell / 2 : cell;
@@ -1474,8 +1505,8 @@
             const random = hash2(col, row, state.seed);
             if (random < eased * state.dropout) continue;
 
-            const jitterX = (hash2(col + 31, row - 17, state.seed) - .5) * cell * state.positionJitter;
-            const jitterY = (hash2(col - 53, row + 29, state.seed) - .5) * cell * state.positionJitter;
+            const jitterX = geometryLocked ? 0 : (hash2(col + 31, row - 17, state.seed) - .5) * cell * state.positionJitter;
+            const jitterY = geometryLocked ? 0 : (hash2(col - 53, row + 29, state.seed) - .5) * cell * state.positionJitter;
             const randomScale = 1 + (hash2(col + 7, row + 73, state.seed) - .5) * 2 * state.sizeJitter;
             const sizeFade = state.sizeFade ? lerp(1, state.minSize, eased) : 1;
             const size = cell / Math.sqrt(3) * state.shapeScale * sizeFade * randomScale;
@@ -1483,16 +1514,17 @@
             const alpha = state.opacityFade ? Math.max(0, 1 - eased) : 1;
             if (alpha < .01) continue;
 
-            const jitterRotation = (hash2(col - 91, row + 11, state.seed) - .5) * 2 * state.rotationJitter;
-            let rotation = state.shapeRotation + jitterRotation;
+            const jitterRotation = geometryLocked ? 0 : (hash2(col - 91, row + 11, state.seed) - .5) * 2 * state.rotationJitter;
+            let rotation = geometryLocked ? 0 : state.shapeRotation + jitterRotation;
             if (physicalTriangleGrid ? !trianglePointsUp : state.alternate && physicalParity) rotation += 180;
+            const seamBleed = geometryLocked ? Math.min(.65, size * .018) : 0;
 
             ctx.save();
             ctx.globalAlpha = alpha;
             ctx.translate(baseX + jitterX, baseY + jitterY);
             ctx.rotate(rotation * Math.PI / 180);
             ctx.scale(1, state.aspect);
-            drawShape(ctx, state.shape, size);
+            drawShape(ctx, state.shape, size + seamBleed);
             ctx.restore();
             visibleCount++;
           }
