@@ -824,12 +824,15 @@
         {
           id: "pattern", label: "网格 / Pattern", controls: [
             { key: "shape", label: "基础图形", type: "select", default: "triangle", options: [["triangle", "三角形"], ["circle", "圆形"], ["square", "方形"], ["diamond", "菱形"], ["line", "线段"]] },
+            { key: "layoutMode", label: "排列方式", type: "select", default: "physical", options: [["physical", "图形物理铺砖"], ["straight", "平接连续"], ["halfDrop", "半落连续"], ["brick", "砖式连续"], ["mirror", "镜像连续"], ["rotate", "旋转连续"], ["diamond", "菱形连续"], ["hex", "六角连续"]] },
+            { key: "mirrorMode", label: "镜像轴向", type: "select", default: "checker", options: [["columns", "交替列上下镜像"], ["rows", "交替行上下镜像"], ["checker", "四方棋盘镜像"]], layouts: ["mirror"] },
+            { key: "rotationStep", label: "旋转步进", type: "select", default: "90", options: [["60", "60° 六向"], ["90", "90° 四向"], ["180", "180° 交替"]], layouts: ["rotate"] },
             { key: "cellSize", label: "单元尺寸", type: "range", min: 12, max: 84, step: 1, default: 32, unit: "px" },
             { key: "shapeScale", label: "图形占比", type: "range", min: .15, max: 1.35, step: .01, default: .94, display: "percent" },
             { key: "aspect", label: "图形纵横比", type: "range", min: .3, max: 2, step: .01, default: 1 },
             { key: "shapeRotation", label: "图形旋转", type: "range", min: -180, max: 180, step: 1, default: 0, unit: "°" },
             { key: "alternate", label: "物理交替翻转", type: "toggle", default: true },
-            { key: "geometryLock", label: "几何锁定", type: "toggle", default: true }
+            { key: "geometryLock", label: "几何锁定", type: "toggle", default: true, layouts: ["physical"] }
           ]
         },
         {
@@ -1021,6 +1024,7 @@
         row.className = `control ${control.type === "toggle" ? "toggle-row" : ""}`;
         row.dataset.key = control.key;
         if (control.modes) row.dataset.modes = control.modes.join(",");
+        if (control.layouts) row.dataset.layouts = control.layouts.join(",");
 
         const head = document.createElement("div");
         head.className = "control-head";
@@ -1130,8 +1134,8 @@
         persistLastState();
         syncControl(key);
         if (key === "imageData") loadSourceImage(value);
-        if (key === "sizeField") syncControlVisibility();
-        if (["shape", "alternate", "geometryLock"].includes(key)) syncGeometryLockState();
+        if (["sizeField", "layoutMode"].includes(key)) syncControlVisibility();
+        if (["shape", "alternate", "geometryLock", "layoutMode"].includes(key)) syncGeometryLockState();
         syncDirtyState();
         scheduleRender();
         if (key === "ratio") requestAnimationFrame(() => requestAnimationFrame(fitCanvas));
@@ -1187,10 +1191,13 @@
         els.controls.querySelectorAll("[data-modes]").forEach(row => {
           row.hidden = !row.dataset.modes.split(",").includes(state.sizeField);
         });
+        els.controls.querySelectorAll("[data-layouts]").forEach(row => {
+          row.hidden = !row.dataset.layouts.split(",").includes(state.layoutMode);
+        });
       }
 
       function geometryIsLocked() {
-        return state.shape === "triangle" && state.alternate && state.geometryLock;
+        return state.layoutMode === "physical" && state.shape === "triangle" && state.alternate && state.geometryLock;
       }
 
       function syncGeometryLockState() {
@@ -1473,26 +1480,19 @@
         ctx.fillStyle = state.foreground;
 
         const cell = state.cellSize;
-        const physicalTriangleGrid = state.shape === "triangle" && state.alternate;
+        const patternLayout = createPatternLayout(cell);
+        const physicalTriangleGrid = patternLayout.kind === "physicalTriangle";
         const geometryLocked = physicalTriangleGrid && state.geometryLock;
-        const triangleHeight = cell * Math.sqrt(3) / 2 * state.aspect;
-        const dy = physicalTriangleGrid ? triangleHeight : cell * Math.sqrt(3) / 2;
-        const dx = physicalTriangleGrid ? cell / 2 : cell;
-        const cols = Math.ceil(width / dx) + 6;
-        const rows = Math.ceil(height / dy) + 5;
+        const cols = Math.ceil(width / patternLayout.dx) + 8;
+        const rows = Math.ceil(height / patternLayout.dy) + 7;
         const fieldContext = createFieldContext(width, height, imageSampler);
         let visibleCount = 0;
 
-        for (let row = -2; row < rows; row++) {
-          const genericY = row * dy;
-          const offset = !physicalTriangleGrid && (row & 1) ? cell * .5 : 0;
-          for (let col = -2; col < cols; col++) {
-            const physicalParity = (col + row) & 1;
-            const trianglePointsUp = physicalParity === 1;
-            const baseX = physicalTriangleGrid ? (col + 1) * dx : col * cell + offset;
-            const baseY = physicalTriangleGrid
-              ? row * triangleHeight + triangleHeight * (trianglePointsUp ? 2 / 3 : 1 / 3)
-              : genericY;
+        for (let row = -3; row < rows; row++) {
+          for (let col = -3; col < cols; col++) {
+            const patternCell = getPatternCell(patternLayout, col, row);
+            const baseX = patternCell.x;
+            const baseY = patternCell.y;
             const nx = baseX / width;
             const ny = baseY / height;
             if (!insideMask(nx, ny)) continue;
@@ -1515,15 +1515,16 @@
             if (alpha < .01) continue;
 
             const jitterRotation = geometryLocked ? 0 : (hash2(col - 91, row + 11, state.seed) - .5) * 2 * state.rotationJitter;
-            let rotation = geometryLocked ? 0 : state.shapeRotation + jitterRotation;
-            if (physicalTriangleGrid ? !trianglePointsUp : state.alternate && physicalParity) rotation += 180;
+            let rotation = (geometryLocked ? 0 : state.shapeRotation + jitterRotation) + patternCell.rotation;
+            const layoutOwnsOrientation = ["mirror", "rotate"].includes(patternLayout.kind);
+            if (!physicalTriangleGrid && !layoutOwnsOrientation && state.alternate && patternCell.parity) rotation += 180;
             const seamBleed = geometryLocked ? Math.min(.65, size * .018) : 0;
 
             ctx.save();
             ctx.globalAlpha = alpha;
             ctx.translate(baseX + jitterX, baseY + jitterY);
             ctx.rotate(rotation * Math.PI / 180);
-            ctx.scale(1, state.aspect);
+            ctx.scale(patternCell.flipX, state.aspect * patternCell.flipY);
             drawShape(ctx, state.shape, size + seamBleed);
             ctx.restore();
             visibleCount++;
@@ -1531,6 +1532,49 @@
         }
         ctx.restore();
         return visibleCount;
+      }
+
+      function createPatternLayout(cell) {
+        const squareHeight = cell * state.aspect;
+        const requested = state.layoutMode;
+        if (requested === "physical") {
+          if (state.shape === "triangle" && state.alternate) {
+            return { kind: "physicalTriangle", dx: cell / 2, dy: cell * Math.sqrt(3) / 2 * state.aspect };
+          }
+          if (state.shape === "circle") return { kind: "hex", dx: cell, dy: cell * Math.sqrt(3) / 2 * state.aspect };
+          if (state.shape === "diamond") return { kind: "diamond", dx: cell, dy: squareHeight / 2 };
+          return { kind: "straight", dx: cell, dy: squareHeight };
+        }
+        if (requested === "diamond") return { kind: "diamond", dx: cell, dy: squareHeight / 2 };
+        if (requested === "hex") return { kind: "hex", dx: cell, dy: cell * Math.sqrt(3) / 2 * state.aspect };
+        return { kind: requested, dx: cell, dy: squareHeight };
+      }
+
+      function getPatternCell(layout, col, row) {
+        const parity = positiveModulo(col + row, 2);
+        const cell = { x: col * layout.dx, y: row * layout.dy, rotation: 0, flipX: 1, flipY: 1, parity };
+        if (layout.kind === "physicalTriangle") {
+          const pointsUp = parity === 1;
+          cell.x = (col + 1) * layout.dx;
+          cell.y = row * layout.dy + layout.dy * (pointsUp ? 2 / 3 : 1 / 3);
+          cell.rotation = pointsUp ? 0 : 180;
+        } else if (layout.kind === "halfDrop") {
+          cell.y += positiveModulo(col, 2) * layout.dy / 2;
+        } else if (layout.kind === "brick" || layout.kind === "diamond" || layout.kind === "hex") {
+          cell.x += positiveModulo(row, 2) * layout.dx / 2;
+        } else if (layout.kind === "mirror") {
+          if (state.mirrorMode === "columns") cell.flipY = positiveModulo(col, 2) ? -1 : 1;
+          if (state.mirrorMode === "rows") cell.flipY = positiveModulo(row, 2) ? -1 : 1;
+          if (state.mirrorMode === "checker") {
+            cell.flipX = positiveModulo(col, 2) ? -1 : 1;
+            cell.flipY = positiveModulo(row, 2) ? -1 : 1;
+          }
+        } else if (layout.kind === "rotate") {
+          const step = Number(state.rotationStep);
+          const cycle = 360 / step;
+          cell.rotation = positiveModulo(col + row, cycle) * step;
+        }
+        return cell;
       }
 
       function createFieldContext(width, height, imageSampler) {
@@ -1787,6 +1831,7 @@
       function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
       function lerp(a, b, t) { return a + (b - a) * t; }
       function smoothstep(t) { return t * t * (3 - 2 * t); }
+      function positiveModulo(value, divisor) { return ((value % divisor) + divisor) % divisor; }
 
       function hash2(x, y, seed) {
         let n = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(seed | 0, 1442695041);
